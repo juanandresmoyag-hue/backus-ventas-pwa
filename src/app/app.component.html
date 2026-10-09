@@ -1,0 +1,117 @@
+<main class="pagina">
+  @if (online) {
+    <section class="terminal" aria-labelledby="terminal-online">
+      <h2 id="terminal-online" class="terminal__title">BACKUS VENTAS PWA</h2>
+
+      <p class="terminal__status">
+        Estado: <span aria-hidden="true">◉</span> CONECTADO
+      </p>
+
+      <section class="catalogo" aria-labelledby="catalogo-title">
+        <h3 id="catalogo-title">Catálogo</h3>
+        @if (catalogoError) {
+          <p class="mensaje mensaje--error" role="alert">{{ catalogoError }}</p>
+        } @else if (productos.length === 0) {
+          <p class="mensaje">Cargando catálogo...</p>
+        } @else {
+          <ul class="productos">
+            @for (producto of productos; track producto.id) {
+              <li>
+                <button
+                  class="producto"
+                  type="button"
+                  [attr.aria-pressed]="producto.id === productoSeleccionadoId"
+                  (click)="seleccionarProducto(producto.id)"
+                >
+                  <span>{{ producto.producto }}</span>
+                  <span>S/ {{ producto.precio.toFixed(2) }}</span>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+
+      <form class="pedido" (submit)="registrarPedido($event)">
+        <label class="pedido__toggle">
+          <input
+            type="checkbox"
+            [checked]="mostrarFormulario"
+            (change)="mostrarFormulario = !mostrarFormulario"
+          >
+          <span>Registrar pedido</span>
+        </label>
+
+        @if (mostrarFormulario) {
+          <label class="campo" for="mensaje">Mensaje</label>
+          <input
+            id="mensaje"
+            name="mensaje"
+            type="text"
+            [value]="mensaje"
+            (input)="actualizarMensaje($event)"
+            autocomplete="off"
+          >
+          @if (notificacion) {
+            <p class="mensaje" role="status">{{ notificacion }}</p>
+          }
+          <button type="submit" [disabled]="productoSeleccionadoId === null || guardando">
+            {{ guardando ? 'Guardando...' : 'Guardar' }}
+          </button>
+        }
+      </form>
+
+      <section class="pedidos-guardados" aria-labelledby="pedidos-online-title">
+        <h3 id="pedidos-online-title">Pedidos guardados</h3>
+        @if (pedidosError) {
+          <p class="mensaje mensaje--error" role="alert">{{ pedidosError }}</p>
+        } @else if (pedidosGuardados.length === 0) {
+          <p class="mensaje">No hay pedidos guardados localmente.</p>
+        } @else {
+          <ul class="lista-pedidos">
+            @for (pedido of pedidosGuardados; track pedido.id) {
+              <li>
+                <span>{{ pedido.producto }}</span>
+                <span>Estado: PENDIENTE</span>
+                @if (pedido.mensaje) {
+                  <span>Mensaje: {{ pedido.mensaje }}</span>
+                }
+              </li>
+            }
+          </ul>
+        }
+      </section>
+    </section>
+  } @else {
+    <section class="terminal terminal--offline" aria-labelledby="terminal-offline">
+      <h2 id="terminal-offline" class="terminal__title">BACKUS VENTAS PWA</h2>
+
+      <p class="terminal__status">
+        Estado: <span aria-hidden="true">◉</span> SIN CONEXIÓN
+      </p>
+
+      <p class="offline-copy">Catálogo disponible<br>desde caché</p>
+
+      <section class="pedidos-guardados" aria-labelledby="pedidos-offline-title">
+        <h3 id="pedidos-offline-title">Pedidos guardados localmente</h3>
+        @if (pedidosError) {
+          <p class="mensaje mensaje--error" role="alert">{{ pedidosError }}</p>
+        } @else if (pedidosGuardados.length === 0) {
+          <p class="mensaje">No hay pedidos guardados.</p>
+        } @else {
+          <ul class="lista-pedidos">
+            @for (pedido of pedidosGuardados; track pedido.id) {
+              <li>
+                <span>{{ pedido.producto }}</span>
+                <span>Estado: PENDIENTE</span>
+                @if (pedido.mensaje) {
+                  <span>Mensaje: {{ pedido.mensaje }}</span>
+                }
+              </li>
+            }
+          </ul>
+        }
+      </section>
+    </section>
+  }
+</main>
