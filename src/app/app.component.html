@@ -1,117 +1,224 @@
 <main class="pagina">
-  @if (online) {
-    <section class="terminal" aria-labelledby="terminal-online">
-      <h2 id="terminal-online" class="terminal__title">BACKUS VENTAS PWA</h2>
+  <header class="encabezado">
+    <div>
+      <p class="marca">BACKUS <span>VENTAS</span></p>
+      <h1>Pedidos</h1>
+      <p class="subtitulo">Arma tu pedido y consúltalo cuando quieras.</p>
+    </div>
+    <div class="conexion" [class.conexion--offline]="!online" role="status">
+      <span class="conexion__punto" aria-hidden="true"></span>
+      {{ online ? 'Con conexión' : 'Sin conexión' }}
+    </div>
+  </header>
 
-      <p class="terminal__status">
-        Estado: <span aria-hidden="true">◉</span> CONECTADO
-      </p>
+  <p class="aviso-local">
+    <span aria-hidden="true">ⓘ</span>
+    Los pedidos se guardan en este dispositivo. No hay una API configurada para enviarlos al servidor.
+  </p>
 
-      <section class="catalogo" aria-labelledby="catalogo-title">
-        <h3 id="catalogo-title">Catálogo</h3>
-        @if (catalogoError) {
-          <p class="mensaje mensaje--error" role="alert">{{ catalogoError }}</p>
-        } @else if (productos.length === 0) {
-          <p class="mensaje">Cargando catálogo...</p>
-        } @else {
-          <ul class="productos">
-            @for (producto of productos; track producto.id) {
-              <li>
-                <button
-                  class="producto"
-                  type="button"
-                  [attr.aria-pressed]="producto.id === productoSeleccionadoId"
-                  (click)="seleccionarProducto(producto.id)"
-                >
-                  <span>{{ producto.producto }}</span>
-                  <span>S/ {{ producto.precio.toFixed(2) }}</span>
-                </button>
-              </li>
-            }
-          </ul>
-        }
-      </section>
+  <!-- En escritorio, catálogo y resumen comparten fila; en móvil conservan este orden vertical. -->
+  <div class="contenido-pedido">
+  <section class="panel catalogo" aria-labelledby="catalogo-title">
+    <div class="titulo-seccion">
+      <div>
+        <p class="sobrelinea">PRODUCTOS</p>
+        <h2 id="catalogo-title">Catálogo</h2>
+      </div>
+      <span class="contador">{{ productosFiltrados.length }} productos</span>
+    </div>
 
-      <form class="pedido" (submit)="registrarPedido($event)">
-        <label class="pedido__toggle">
-          <input
-            type="checkbox"
-            [checked]="mostrarFormulario"
-            (change)="mostrarFormulario = !mostrarFormulario"
-          >
-          <span>Registrar pedido</span>
-        </label>
-
-        @if (mostrarFormulario) {
-          <label class="campo" for="mensaje">Mensaje</label>
-          <input
-            id="mensaje"
-            name="mensaje"
-            type="text"
-            [value]="mensaje"
-            (input)="actualizarMensaje($event)"
-            autocomplete="off"
-          >
-          @if (notificacion) {
-            <p class="mensaje" role="status">{{ notificacion }}</p>
+    <div class="filtros">
+      <label class="filtro filtro--busqueda">
+        <span>Buscar producto</span>
+        <input
+          type="search"
+          name="busqueda"
+          placeholder="Ej. Cristal 620 ml"
+          [value]="busqueda"
+          (input)="actualizarBusqueda($event)"
+        >
+      </label>
+      <label class="filtro">
+        <span>Categoría</span>
+        <select
+          name="categoria"
+          [value]="categoriaSeleccionada"
+          (change)="actualizarCategoria($event)"
+        >
+          <option value="">Todas las categorías</option>
+          @for (categoria of categorias; track categoria) {
+            <option [value]="categoria">{{ categoria }}</option>
           }
-          <button type="submit" [disabled]="productoSeleccionadoId === null || guardando">
-            {{ guardando ? 'Guardando...' : 'Guardar' }}
-          </button>
-        }
-      </form>
+        </select>
+      </label>
+      <button class="boton boton--secundario boton--limpiar" type="button" (click)="limpiarFiltros()">
+        Limpiar filtros
+      </button>
+    </div>
 
-      <section class="pedidos-guardados" aria-labelledby="pedidos-online-title">
-        <h3 id="pedidos-online-title">Pedidos guardados</h3>
-        @if (pedidosError) {
-          <p class="mensaje mensaje--error" role="alert">{{ pedidosError }}</p>
-        } @else if (pedidosGuardados.length === 0) {
-          <p class="mensaje">No hay pedidos guardados localmente.</p>
-        } @else {
-          <ul class="lista-pedidos">
-            @for (pedido of pedidosGuardados; track pedido.id) {
-              <li>
-                <span>{{ pedido.producto }}</span>
-                <span>Estado: PENDIENTE</span>
-                @if (pedido.mensaje) {
-                  <span>Mensaje: {{ pedido.mensaje }}</span>
-                }
-              </li>
+    @if (catalogoError) {
+      <p class="mensaje mensaje--error" role="alert">{{ catalogoError }}</p>
+    } @else if (productos.length === 0) {
+      <p class="vacio">Cargando productos...</p>
+    } @else if (productosFiltrados.length === 0) {
+      <p class="vacio">No encontramos productos con esos filtros.</p>
+    } @else {
+      <div class="tabla-contenedor">
+        <table class="tabla-productos">
+          <thead>
+            <tr>
+              <th scope="col">Producto</th>
+              <th scope="col">Categoría</th>
+              <th scope="col">Precio</th>
+              <th scope="col">Cantidad</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (producto of productosFiltrados; track producto.id) {
+              <tr>
+                <td class="nombre-producto">{{ producto.producto }}</td>
+                <td><span class="etiqueta">{{ producto.categoria }}</span></td>
+                <td>S/ {{ producto.precio.toFixed(2) }}</td>
+                <td>
+                  <input
+                    class="cantidad"
+                    type="text"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    autocomplete="off"
+                    [name]="'cantidad-' + producto.id"
+                    [attr.aria-label]="'Cantidad de ' + producto.producto"
+                    [attr.aria-invalid]="intentoRegistrar && cantidadInvalida(cantidades[producto.id])"
+                    placeholder="1+"
+                    [value]="cantidad(producto.id)"
+                    (input)="actualizarCantidad(producto.id, $event)"
+                  >
+                </td>
+              </tr>
             }
-          </ul>
-        }
-      </section>
-    </section>
-  } @else {
-    <section class="terminal terminal--offline" aria-labelledby="terminal-offline">
-      <h2 id="terminal-offline" class="terminal__title">BACKUS VENTAS PWA</h2>
+          </tbody>
+        </table>
+      </div>
+      @if (intentoRegistrar && hayCantidadesInvalidas) {
+        <p class="ayuda-error">Ingresa solo enteros mayores que cero.</p>
+      }
+    }
+  </section>
 
-      <p class="terminal__status">
-        Estado: <span aria-hidden="true">◉</span> SIN CONEXIÓN
+  <form class="panel resumen" (submit)="registrarPedido($event)" novalidate>
+    <div class="titulo-seccion">
+      <div>
+        <p class="sobrelinea">ANTES DE GUARDAR</p>
+        <h2>Resumen del pedido</h2>
+      </div>
+      <span class="contador">{{ lineasResumen.length }} {{ lineasResumen.length === 1 ? 'línea' : 'líneas' }}</span>
+    </div>
+
+    @if (lineasResumen.length === 0) {
+      <p class="vacio">Agrega cantidades en el catálogo para ver tu pedido.</p>
+    } @else {
+      <div class="tabla-contenedor">
+        <table class="tabla-resumen">
+          <thead>
+            <tr>
+              <th scope="col">Producto</th>
+              <th scope="col">Precio unitario</th>
+              <th scope="col">Cantidad</th>
+              <th scope="col">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (linea of lineasResumen; track linea.productoId) {
+              <tr>
+                <td class="nombre-producto">{{ linea.producto }}</td>
+                <td>S/ {{ linea.precioUnitario.toFixed(2) }}</td>
+                <td>{{ linea.cantidad }}</td>
+                <td class="subtotal">S/ {{ linea.subtotal.toFixed(2) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <div class="total">
+      <span>Total del pedido</span>
+      <strong>S/ {{ totalPedido.toFixed(2) }}</strong>
+    </div>
+
+    @if (notificacion) {
+      <p class="mensaje" [class.mensaje--error]="notificacionEsError" [class.mensaje--exito]="!notificacionEsError" role="status">
+        {{ notificacion }}
       </p>
+    }
+    <button
+      class="boton boton--principal"
+      type="submit"
+      [disabled]="guardando || productos.length === 0"
+    >
+      {{ guardando ? 'Guardando pedido...' : 'Guardar pedido en este dispositivo' }}
+    </button>
+  </form>
+  </div>
 
-      <p class="offline-copy">Catálogo disponible<br>desde caché</p>
+  <section class="panel historial" aria-labelledby="historial-title">
+    <div class="titulo-seccion">
+      <div>
+        <p class="sobrelinea">ALMACENAMIENTO LOCAL</p>
+        <h2 id="historial-title">Historial de pedidos</h2>
+      </div>
+      <span class="contador">{{ pedidosGuardados.length }} {{ pedidosGuardados.length === 1 ? 'pedido' : 'pedidos' }}</span>
+    </div>
 
-      <section class="pedidos-guardados" aria-labelledby="pedidos-offline-title">
-        <h3 id="pedidos-offline-title">Pedidos guardados localmente</h3>
-        @if (pedidosError) {
-          <p class="mensaje mensaje--error" role="alert">{{ pedidosError }}</p>
-        } @else if (pedidosGuardados.length === 0) {
-          <p class="mensaje">No hay pedidos guardados.</p>
-        } @else {
-          <ul class="lista-pedidos">
-            @for (pedido of pedidosGuardados; track pedido.id) {
-              <li>
-                <span>{{ pedido.producto }}</span>
-                <span>Estado: PENDIENTE</span>
-                @if (pedido.mensaje) {
-                  <span>Mensaje: {{ pedido.mensaje }}</span>
+    @if (pedidosError) {
+      <p class="mensaje mensaje--error" role="alert">{{ pedidosError }}</p>
+    } @else if (pedidosGuardados.length === 0) {
+      <div class="historial-vacio">
+        <span class="historial-vacio__icono" aria-hidden="true">＋</span>
+        <p>Aún no tienes pedidos guardados.</p>
+        <span>Cuando registres uno, aparecerá aquí.</span>
+      </div>
+    } @else {
+      <ul class="lista-pedidos">
+        @for (pedido of pedidosGuardados; track pedido.id) {
+          <li class="pedido">
+            <div class="pedido__cabecera">
+              <div>
+                <span class="pedido__numero">Pedido #{{ pedido.id }}</span>
+                <time class="pedido__fecha" [attr.datetime]="pedido.fecha">{{ formatearFecha(pedido.fecha) }}</time>
+              </div>
+              <span class="estado">{{ pedido.estado.toUpperCase() }}</span>
+            </div>
+            <div class="pedido__pie">
+              <span>{{ lineasPedido(pedido).length }} {{ lineasPedido(pedido).length === 1 ? 'producto' : 'productos' }}</span>
+              <strong>S/ {{ (pedido.total ?? 0).toFixed(2) }}</strong>
+              <button class="enlace-detalle" type="button" (click)="alternarDetalle(pedido.id)">
+                {{ pedidoExpandidoId === pedido.id ? 'Ocultar detalle' : 'Ver detalle' }}
+              </button>
+            </div>
+            @if (pedidoExpandidoId === pedido.id) {
+              <div class="detalle">
+                <p class="detalle__origen">Origen: {{ pedido.origen ?? 'DISPOSITIVO' }}</p>
+                @for (linea of lineasPedido(pedido); track linea.productoId) {
+                  <div class="detalle__linea">
+                    <span>{{ linea.producto }}</span>
+                    <span>{{ linea.cantidad }} × S/ {{ linea.precioUnitario.toFixed(2) }}</span>
+                    <strong>S/ {{ linea.subtotal.toFixed(2) }}</strong>
+                  </div>
                 }
-              </li>
+                @if (pedido.mensaje) {
+                  <p class="detalle__mensaje">Mensaje: {{ pedido.mensaje }}</p>
+                }
+              </div>
             }
-          </ul>
+          </li>
         }
-      </section>
-    </section>
-  }
+      </ul>
+    }
+  </section>
+
+  <footer class="pie">
+    <span>BACKUS VENTAS</span>
+    <span>Pedidos guardados localmente · Estado inicial: PENDIENTE</span>
+  </footer>
 </main>

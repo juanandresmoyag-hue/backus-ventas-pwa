@@ -1,15 +1,30 @@
 import { Injectable } from '@angular/core';
 
-export interface PedidoGuardado {
-  id: number;
+export interface LineaPedido {
   productoId: number;
   producto: string;
-  mensaje: string;
-  fecha: string;
-  estado: 'pendiente';
+  precioUnitario: number;
+  cantidad: number;
+  subtotal: number;
 }
 
-export type NuevoPedido = Omit<PedidoGuardado, 'id' | 'fecha' | 'estado'>;
+export interface PedidoGuardado {
+  id: number;
+  lineas?: LineaPedido[];
+  total?: number;
+  origen?: string;
+  fecha: string;
+  estado: 'PENDIENTE' | 'pendiente';
+  productoId?: number;
+  producto?: string;
+  mensaje?: string;
+}
+
+export type NuevoPedido = Pick<PedidoGuardado, 'lineas' | 'total' | 'origen'> & {
+  lineas: LineaPedido[];
+  total: number;
+  origen: string;
+};
 
 @Injectable({
   providedIn: 'root'
@@ -33,7 +48,8 @@ export class StorageService {
       };
 
       request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      request.onerror = () => reject(request.error ?? new Error('No se pudo abrir IndexedDB.'));
+      request.onblocked = () => reject(new Error('La base local está bloqueada por otra pestaña.'));
     });
   }
 
@@ -41,25 +57,38 @@ export class StorageService {
     const db = await this.abrirDB();
 
     return new Promise((resolve, reject) => {
-      const transaction = db.transaction(this.storeName, 'readwrite');
-      transaction.objectStore(this.storeName).add({
-        ...pedido,
-        fecha: new Date().toISOString(),
-        estado: 'pendiente'
-      });
+      let finalizado = false;
+      const cerrar = () => {
+        if (!finalizado) {
+          finalizado = true;
+          db.close();
+        }
+      };
 
-      transaction.oncomplete = () => {
-        db.close();
-        resolve();
-      };
-      transaction.onerror = () => {
-        db.close();
-        reject(transaction.error);
-      };
-      transaction.onabort = () => {
-        db.close();
-        reject(transaction.error);
-      };
+      try {
+        const transaction = db.transaction(this.storeName, 'readwrite');
+        transaction.objectStore(this.storeName).add({
+          ...pedido,
+          fecha: new Date().toISOString(),
+          estado: 'PENDIENTE'
+        });
+
+        transaction.oncomplete = () => {
+          cerrar();
+          resolve();
+        };
+        transaction.onerror = () => {
+          cerrar();
+          reject(transaction.error ?? new Error('Falló la escritura del pedido.'));
+        };
+        transaction.onabort = () => {
+          cerrar();
+          reject(transaction.error ?? new Error('Se canceló la escritura del pedido.'));
+        };
+      } catch (error) {
+        cerrar();
+        reject(error);
+      }
     });
   }
 
@@ -67,20 +96,42 @@ export class StorageService {
     const db = await this.abrirDB();
 
     return new Promise((resolve, reject) => {
-      const transaction = db.transaction(this.storeName, 'readonly');
-      const request = transaction.objectStore(this.storeName).getAll();
+      let finalizado = false;
+      const cerrar = () => {
+        if (!finalizado) {
+          finalizado = true;
+          db.close();
+        }
+      };
 
-      request.onsuccess = () => resolve(request.result as PedidoGuardado[]);
-      request.onerror = () => reject(request.error);
-      transaction.oncomplete = () => db.close();
-      transaction.onerror = () => {
-        db.close();
-        reject(transaction.error);
-      };
-      transaction.onabort = () => {
-        db.close();
-        reject(transaction.error);
-      };
+      try {
+        const transaction = db.transaction(this.storeName, 'readonly');
+        const request = transaction.objectStore(this.storeName).getAll();
+        let pedidos: PedidoGuardado[] = [];
+
+        request.onsuccess = () => {
+          pedidos = request.result as PedidoGuardado[];
+        };
+        request.onerror = () => {
+          cerrar();
+          reject(request.error ?? new Error('Falló la lectura del historial.'));
+        };
+        transaction.oncomplete = () => {
+          cerrar();
+          resolve(pedidos.sort((a, b) => b.fecha.localeCompare(a.fecha)));
+        };
+        transaction.onerror = () => {
+          cerrar();
+          reject(transaction.error ?? new Error('Falló la lectura del historial.'));
+        };
+        transaction.onabort = () => {
+          cerrar();
+          reject(transaction.error ?? new Error('Se canceló la lectura del historial.'));
+        };
+      } catch (error) {
+        cerrar();
+        reject(error);
+      }
     });
   }
 }
