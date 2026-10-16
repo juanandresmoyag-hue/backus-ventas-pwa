@@ -16,5 +16,24 @@
     "producto": "Cusqueña 620 ml", 
     "categoria": "Cerveza", 
     "precio": 9.00 
+  },
+  { 
+    "id": 4, 
+    "producto": "Marina 620 ml", 
+    "categoria": "Cerveza", 
+    "precio": 10.00 
+  },
+  { 
+    "id": 5, 
+    "producto": "Trigal 620 ml", 
+    "categoria": "agua", 
+    "precio": 11.00 
+  },
+  { 
+    "id": 6, 
+    "producto": "Imperial 620 ml", 
+    "categoria": "Cerveza", 
+    "precio": 12.00 
   } 
+  
 ] 

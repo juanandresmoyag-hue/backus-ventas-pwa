@@ -13,10 +13,10 @@ import {
   templateUrl: './app.component.html',
 })
 export class AppComponent implements OnInit, OnDestroy {
-  title = 'backus-ventas-pwa';
   online = navigator.onLine;
   productos: Producto[] = [];
   pedidosGuardados: PedidoGuardado[] = [];
+  productosEnPedidoIds: number[] = [];
   cantidades: Record<number, string> = {};
   busqueda = '';
   categoriaSeleccionada = '';
@@ -60,8 +60,8 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   get lineasResumen(): LineaPedido[] {
-    // Solo las cantidades enteras positivas forman parte del resumen y del total.
-    return this.productos.flatMap((producto) => {
+    // Solo las cantidades enteras positivas forman parte del total del pedido.
+    return this.productosEnPedido.flatMap((producto) => {
       const valor = this.cantidades[producto.id] ?? '';
       if (!this.esCantidadValida(valor)) {
         return [];
@@ -79,9 +79,16 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   get hayCantidadesInvalidas(): boolean {
-    return this.productos.some((producto) => {
+    return this.productosEnPedido.some((producto) => {
       const valor = this.cantidades[producto.id] ?? '';
-      return valor !== '' && !this.esCantidadValida(valor);
+      return !this.esCantidadValida(valor);
+    });
+  }
+
+  get productosEnPedido(): Producto[] {
+    return this.productosEnPedidoIds.flatMap((productoId) => {
+      const producto = this.productos.find((item) => item.id === productoId);
+      return producto ? [producto] : [];
     });
   }
 
@@ -118,9 +125,47 @@ export class AppComponent implements OnInit, OnDestroy {
     return this.cantidades[productoId] ?? '';
   }
 
+  agregarProducto(productoId: number): void {
+    const cantidadActual = this.cantidad(productoId);
+    if (!this.productosEnPedidoIds.includes(productoId)) {
+      this.productosEnPedidoIds = [...this.productosEnPedidoIds, productoId];
+      this.cantidades[productoId] = '1';
+      return;
+    }
+
+    if (this.esCantidadValida(cantidadActual)) {
+      const cantidad = Number(cantidadActual);
+      if (cantidad < Number.MAX_SAFE_INTEGER) {
+        this.cantidades[productoId] = String(cantidad + 1);
+      }
+    }
+  }
+
+  manejarTecladoProducto(event: KeyboardEvent, productoId: number): void {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      this.agregarProducto(productoId);
+    }
+  }
+
   actualizarCantidad(productoId: number, event: Event): void {
     this.cantidades[productoId] = (event.target as HTMLInputElement).value;
     this.notificacion = '';
+  }
+
+  subtotalProducto(productoId: number): number {
+    const producto = this.productos.find((item) => item.id === productoId);
+    const cantidad = this.cantidad(productoId);
+    return producto && this.esCantidadValida(cantidad)
+      ? producto.precio * Number(cantidad)
+      : 0;
+  }
+
+  quitarProducto(productoId: number): void {
+    this.productosEnPedidoIds = this.productosEnPedidoIds.filter((id) => id !== productoId);
+    const cantidadesRestantes = { ...this.cantidades };
+    delete cantidadesRestantes[productoId];
+    this.cantidades = cantidadesRestantes;
   }
 
   limpiarFiltros(): void {
@@ -143,7 +188,7 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     const lineas = this.lineasResumen;
-    if (lineas.length === 0) {
+    if (this.productosEnPedidoIds.length === 0 || lineas.length === 0) {
       this.mostrarError('Agrega al menos un producto con una cantidad válida para registrar el pedido.');
       return;
     }
@@ -159,10 +204,10 @@ export class AppComponent implements OnInit, OnDestroy {
       // El mensaje de éxito se asigna únicamente después de confirmar la escritura local.
       await this.storageService.guardarPedido(pedido);
       this.notificacion = this.online
-        ? 'Pedido guardado en este dispositivo. No se envió al servidor porque la API no está configurada.'
-        : 'Pedido guardado en este dispositivo. No se envió al servidor porque no hay conexión ni API configurada.';
-      this.notificacionEsError = false;
+        ? 'Pedido guardado en este dispositivo; no fue enviado al servidor porque no hay una API configurada.'
+        : 'Pedido guardado en este dispositivo y pendiente; no fue enviado al servidor porque no hay conexión ni API configurada.';
       this.cantidades = {};
+      this.productosEnPedidoIds = [];
       this.intentoRegistrar = false;
       await this.cargarPedidosGuardados();
     } catch {
@@ -184,7 +229,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   cantidadInvalida(valor: string | undefined): boolean {
-    return Boolean(valor) && !this.esCantidadValida(valor);
+    return valor !== undefined && !this.esCantidadValida(valor);
   }
 
   formatearFecha(fecha: string): string {
@@ -222,7 +267,7 @@ export class AppComponent implements OnInit, OnDestroy {
     try {
       this.pedidosGuardados = await this.storageService.obtenerPedidos();
     } catch {
-      this.pedidosError = 'No se pudo leer el historial local. Revisa el almacenamiento del dispositivo.';
+      this.pedidosError = 'No se pudo leer el historial local';
     }
   }
 }

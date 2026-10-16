@@ -48,8 +48,8 @@ export class StorageService {
       };
 
       request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error ?? new Error('No se pudo abrir IndexedDB.'));
-      request.onblocked = () => reject(new Error('La base local está bloqueada por otra pestaña.'));
+      request.onerror = () => reject(request.error ?? new Error('No se pudo abrir.'));
+      request.onblocked = () => reject(new Error('está bloqueada por otra pestaña.'));
     });
   }
 
@@ -83,7 +83,7 @@ export class StorageService {
         };
         transaction.onabort = () => {
           cerrar();
-          reject(transaction.error ?? new Error('Se canceló la escritura del pedido.'));
+          reject(transaction.error ?? new Error('Se canceló el pedido.'));
         };
       } catch (error) {
         cerrar();

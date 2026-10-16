@@ -70,38 +70,34 @@
               <th scope="col">Producto</th>
               <th scope="col">Categoría</th>
               <th scope="col">Precio</th>
-              <th scope="col">Cantidad</th>
             </tr>
           </thead>
           <tbody>
             @for (producto of productosFiltrados; track producto.id) {
-              <tr>
-                <td class="nombre-producto">{{ producto.producto }}</td>
-                <td><span class="etiqueta">{{ producto.categoria }}</span></td>
-                <td>S/ {{ producto.precio.toFixed(2) }}</td>
-                <td>
-                  <input
-                    class="cantidad"
-                    type="text"
-                    inputmode="numeric"
-                    pattern="[0-9]*"
-                    autocomplete="off"
-                    [name]="'cantidad-' + producto.id"
-                    [attr.aria-label]="'Cantidad de ' + producto.producto"
-                    [attr.aria-invalid]="intentoRegistrar && cantidadInvalida(cantidades[producto.id])"
-                    placeholder="1+"
-                    [value]="cantidad(producto.id)"
-                    (input)="actualizarCantidad(producto.id, $event)"
-                  >
+              <tr
+                class="fila-producto"
+                [class.fila-producto--agregado]="productosEnPedidoIds.includes(producto.id)"
+                role="button"
+                tabindex="0"
+                [attr.aria-pressed]="productosEnPedidoIds.includes(producto.id)"
+                [attr.aria-label]="(productosEnPedidoIds.includes(producto.id) ? 'Agregar otra unidad de ' : 'Agregar ') + producto.producto + ', ' + producto.categoria + ', S/ ' + producto.precio.toFixed(2)"
+                (click)="agregarProducto(producto.id)"
+                (keydown)="manejarTecladoProducto($event, producto.id)"
+              >
+                <td class="nombre-producto" data-label="Producto">{{ producto.producto }}</td>
+                <td class="categoria-producto" data-label="Categoría"><span class="etiqueta">{{ producto.categoria }}</span></td>
+                <td class="precio-producto">
+                  <span class="solo-lectores">Precio: </span>
+                  <span>S/ {{ producto.precio.toFixed(2) }}</span>
+                  <span class="indicador-agregar">
+                    {{ productosEnPedidoIds.includes(producto.id) ? 'Agregar otro' : '+ Agregar' }}
+                  </span>
                 </td>
               </tr>
             }
           </tbody>
         </table>
       </div>
-      @if (intentoRegistrar && hayCantidadesInvalidas) {
-        <p class="ayuda-error">Ingresa solo enteros mayores que cero.</p>
-      }
     }
   </section>
 
@@ -111,11 +107,11 @@
         <p class="sobrelinea">ANTES DE GUARDAR</p>
         <h2>Resumen del pedido</h2>
       </div>
-      <span class="contador">{{ lineasResumen.length }} {{ lineasResumen.length === 1 ? 'línea' : 'líneas' }}</span>
+      <span class="contador">{{ productosEnPedido.length }} {{ productosEnPedido.length === 1 ? 'producto' : 'productos' }}</span>
     </div>
 
-    @if (lineasResumen.length === 0) {
-      <p class="vacio">Agrega cantidades en el catálogo para ver tu pedido.</p>
+    @if (productosEnPedido.length === 0) {
+      <p class="vacio">Agrega productos desde el catálogo para armar tu pedido.</p>
     } @else {
       <div class="tabla-contenedor">
         <table class="tabla-resumen">
@@ -125,15 +121,40 @@
               <th scope="col">Precio unitario</th>
               <th scope="col">Cantidad</th>
               <th scope="col">Subtotal</th>
+              <th scope="col"><span class="solo-lectores">Acciones</span></th>
             </tr>
           </thead>
           <tbody>
-            @for (linea of lineasResumen; track linea.productoId) {
+            @for (producto of productosEnPedido; track producto.id) {
               <tr>
-                <td class="nombre-producto">{{ linea.producto }}</td>
-                <td>S/ {{ linea.precioUnitario.toFixed(2) }}</td>
-                <td>{{ linea.cantidad }}</td>
-                <td class="subtotal">S/ {{ linea.subtotal.toFixed(2) }}</td>
+              <td class="nombre-producto" data-label="Producto">{{ producto.producto }}</td>
+              <td data-label="Precio unitario">S/ {{ producto.precio.toFixed(2) }}</td>
+              <td data-label="Cantidad">
+                  <input
+                    class="cantidad"
+                    type="text"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    autocomplete="off"
+                    [name]="'cantidad-' + producto.id"
+                    [attr.aria-label]="'Cantidad de ' + producto.producto"
+                    [attr.aria-invalid]="intentoRegistrar && cantidadInvalida(cantidad(producto.id))"
+                    [value]="cantidad(producto.id)"
+                    (input)="actualizarCantidad(producto.id, $event)"
+                  >
+                </td>
+                <td class="subtotal" data-label="Subtotal">
+                  @if (esCantidadValida(cantidad(producto.id))) {
+                    S/ {{ subtotalProducto(producto.id).toFixed(2) }}
+                  } @else {
+                    <span class="subtotal--invalido">Cantidad inválida</span>
+                  }
+                </td>
+                <td data-label="Acción">
+                  <button class="boton-quitar" type="button" (click)="quitarProducto(producto.id)" [attr.aria-label]="'Quitar ' + producto.producto">
+                    Quitar
+                  </button>
+                </td>
               </tr>
             }
           </tbody>
@@ -150,6 +171,9 @@
       <p class="mensaje" [class.mensaje--error]="notificacionEsError" [class.mensaje--exito]="!notificacionEsError" role="status">
         {{ notificacion }}
       </p>
+    }
+    @if (intentoRegistrar && hayCantidadesInvalidas) {
+      <p class="ayuda-error">Ingresa solo enteros mayores que cero en los productos agregados.</p>
     }
     <button
       class="boton boton--principal"
